@@ -6,7 +6,7 @@ import uniq from 'lodash.uniq';
 import TouchableContainer from './TouchableContainer';
 
 async function getDefaultStats() {
-  const result = await fetch('/stats.json');
+  const result = await fetch('stats.json');
 
   return await result.json();
 }
@@ -126,7 +126,7 @@ class WebpackGraphTree extends PureComponent {
   }
 
   render() {
-    const { width, height, rotation, onAnimate, font } = this.props;
+    const { width, height, rotation, onAnimate } = this.props;
     const { nodeVertices, nodeColors, edgeVertices, edgeColors } = this.state;
 
     return (
