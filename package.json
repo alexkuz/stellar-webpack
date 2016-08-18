@@ -2,6 +2,7 @@
   "name": "stellar-webpack",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://alexkuz.github.io/stellar-webpack/",
   "devDependencies": {
     "autoprefixer": "6.3.7",
     "babel-core": "6.11.4",
