@@ -2,6 +2,7 @@ var path = require('path');
 var autoprefixer = require('autoprefixer');
 var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
+var CopyWebpackPlugin = require('copy-webpack-plugin');
 var ExtractTextPlugin = require('extract-text-webpack-plugin');
 var url = require('url');
 var paths = require('./paths');
@@ -134,6 +135,7 @@ module.exports = {
         screw_ie8: true
       }
     }),
-    new ExtractTextPlugin('static/css/[name].[contenthash:8].css')
+    new ExtractTextPlugin('static/css/[name].[contenthash:8].css'),
+    new CopyWebpackPlugin([{ from: 'stats.json', to: 'stats.json' }])
   ]
 };

@@ -1,6 +1,6 @@
 {
-  "name": "webpack-springy",
-  "version": "0.0.1",
+  "name": "stellar-webpack",
+  "version": "0.1.0",
   "private": true,
   "devDependencies": {
     "autoprefixer": "6.3.7",
@@ -16,10 +16,12 @@
     "babel-preset-es2015": "6.9.0",
     "babel-preset-es2016": "6.11.3",
     "babel-preset-react": "6.11.1",
+    "babel-preset-stage-3": "^6.11.0",
     "babel-runtime": "6.11.6",
     "brfs": "^1.4.3",
     "case-sensitive-paths-webpack-plugin": "1.1.2",
     "chalk": "1.1.3",
+    "copy-webpack-plugin": "^3.0.1",
     "cross-spawn": "4.0.0",
     "css-loader": "0.23.1",
     "eslint": "3.1.1",
@@ -48,6 +50,9 @@
   },
   "dependencies": {
     "basscss": "^8.0.2",
+    "basscss-background-colors": "^2.1.0",
+    "basscss-colors": "^2.2.0",
+    "lodash.uniq": "^4.5.0",
     "paths-js": "^0.4.4",
     "raf": "^3.2.0",
     "react": "^15.2.1",
@@ -59,7 +64,9 @@
   },
   "scripts": {
     "start": "node ./scripts/start.js",
-    "build": "node ./scripts/build.js"
+    "build": "node ./scripts/build.js",
+    "stats": "NODE_ENV=production webpack --profile --json --config config/webpack.config.prod.js > stats.json",
+    "gh": "git subtree push --prefix build origin gh-pages"
   },
   "eslintConfig": {
     "extends": "./config/eslint.js"

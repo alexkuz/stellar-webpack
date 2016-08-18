@@ -1,5 +1,5 @@
 /**
- * Springy v2.7.1
+ * Based on: Springy https://github.com/dhotson/springy
  *
  * Copyright (c) 2010-2013 Dennis Hotson
  *
@@ -25,14 +25,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import raf from 'raf';
+
 var seed = Math.random() * 999999;
 
 function random() {
-    var x = Math.sin(seed++) * 10000;
-    return x - Math.floor(x);
+  var x = Math.sin(seed++) * 10000;
+  return x - Math.floor(x);
 }
 
-import raf from 'raf';
+// =================
+// Node
+// =================
+
+export const Node = function(id, data) {
+	this.id = id;
+	this.data = (data !== undefined) ? data : {};
+};
+
+// =================
+// Edge
+// =================
+
+export const Edge = function(id, source, target, data) {
+	this.id = id;
+	this.source = source;
+	this.target = target;
+	this.data = (data !== undefined) ? data : {};
+};
+
+// =================
+// Graph
+// =================
 
 export const Graph = function(json) {
 	this.nodeSet = {};
@@ -49,27 +73,6 @@ export const Graph = function(json) {
 	}
 };
 
-export const Node = function(id, data) {
-	this.id = id;
-	this.data = (data !== undefined) ? data : {};
-
-// Data fields used by layout algorithm in this file:
-// this.data.mass
-// Data used by default renderer in springyui.js
-// this.data.label
-};
-
-export const Edge = function(id, source, target, data) {
-	this.id = id;
-	this.source = source;
-	this.target = target;
-	this.data = (data !== undefined) ? data : {};
-
-// Edge data field used by layout alorithm
-// this.data.length
-// this.data.type
-};
-
 Graph.prototype.addNode = function(node) {
 	if (!(node.id in this.nodeSet)) {
 		this.nodes.push(node);
@@ -77,7 +80,6 @@ Graph.prototype.addNode = function(node) {
 
 	this.nodeSet[node.id] = node;
 
-	this.notify();
 	return node;
 };
 
@@ -117,7 +119,6 @@ Graph.prototype.addEdge = function(edge) {
 		this.adjacency[edge.source.id][edge.target.id].push(edge);
 	}
 
-	this.notify();
 	return edge;
 };
 
@@ -152,42 +153,10 @@ Graph.prototype.newEdge = function(source, target, data) {
 	return edge;
 };
 
-
-// add nodes and edges from JSON object
 Graph.prototype.loadJSON = function(json) {
-/**
-Springy's simple JSON format for graphs.
-
-historically, Springy uses separate lists
-of nodes and edges:
-
-	{
-		"nodes": [
-			"center",
-			"left",
-			"right",
-			"up",
-			"satellite"
-		],
-		"edges": [
-			["center", "left"],
-			["center", "right"],
-			["center", "up"]
-		]
-	}
-
-**/
-	// parse if a string is passed (EC5+ browsers)
-	if (typeof json === 'string' || json instanceof String) {
-		json = JSON.parse( json );
-	}
-
-	if ('nodes' in json || 'edges' in json) {
-		this.addNodes.apply(this, json['nodes']);
-		this.addEdges.apply(this, json['edges']);
-	}
+	this.addNodes.apply(this, json['nodes']);
+	this.addEdges.apply(this, json['edges']);
 }
-
 
 // find the edges from node1 to node2
 Graph.prototype.getEdges = function(node1, node2) {
@@ -199,128 +168,64 @@ Graph.prototype.getEdges = function(node1, node2) {
 	return [];
 };
 
-// remove a node and it's associated edges from the graph
-Graph.prototype.removeNode = function(node) {
-	if (node.id in this.nodeSet) {
-		delete this.nodeSet[node.id];
+// =================
+// Vector
+// =================
+
+export const Vector = function(x, y, z) {
+	this.x = x;
+	this.y = y;
+	this.z = z;
+};
+
+Vector.random = function() {
+	return new Vector(
+		10.0 * (random() - 0.5),
+		10.0 * (random() - 0.5),
+		10.0 * (random() - 0.5)
+	);
+};
+
+Vector.prototype.add = function(v2) {
+	return new Vector(this.x + v2.x, this.y + v2.y, this.z + v2.z);
+};
+
+Vector.prototype.subtract = function(v2) {
+	return new Vector(this.x - v2.x, this.y - v2.y, this.z - v2.z);
+};
+
+Vector.prototype.multiply = function(n) {
+	return new Vector(this.x * n, this.y * n, this.z * n);
+};
+
+Vector.prototype.divide = function(n) {
+	return new Vector((this.x / n) || 0, (this.y / n) || 0, (this.z / n) || 0); // Avoid divide by zero errors..
+};
+
+Vector.prototype.magnitude = function() {
+	return Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z);
+};
+
+Vector.prototype.magnitude2 = function() {
+	return this.x*this.x + this.y*this.y + this.z*this.z;
+};
+
+Vector.prototype.normalize = function() {
+	return this.divide(this.magnitude());
+};
+
+Vector.prototype.limit = function(limit) {
+	if (limit * limit > this.magnitude2()) {
+		return this;
 	}
 
-	for (var i = this.nodes.length - 1; i >= 0; i--) {
-		if (this.nodes[i].id === node.id) {
-			this.nodes.splice(i, 1);
-		}
-	}
-
-	this.detachNode(node);
+	return this.normalize().multiply(limit);
 };
 
-// removes edges associated with a given node
-Graph.prototype.detachNode = function(node) {
-	var tmpEdges = this.edges.slice();
-	tmpEdges.forEach(function(e) {
-		if (e.source.id === node.id || e.target.id === node.id) {
-			this.removeEdge(e);
-		}
-	}, this);
+// =================
+// Layout
+// =================
 
-	this.notify();
-};
-
-// remove a node and it's associated edges from the graph
-Graph.prototype.removeEdge = function(edge) {
-	for (var i = this.edges.length - 1; i >= 0; i--) {
-		if (this.edges[i].id === edge.id) {
-			this.edges.splice(i, 1);
-		}
-	}
-
-	for (var x in this.adjacency) {
-		for (var y in this.adjacency[x]) {
-			var edges = this.adjacency[x][y];
-
-			for (var j=edges.length - 1; j>=0; j--) {
-				if (this.adjacency[x][y][j].id === edge.id) {
-					this.adjacency[x][y].splice(j, 1);
-				}
-			}
-
-			// Clean up empty edge arrays
-			if (this.adjacency[x][y].length === 0) {
-				delete this.adjacency[x][y];
-			}
-		}
-
-		// Clean up empty objects
-		if (isEmpty(this.adjacency[x])) {
-			delete this.adjacency[x];
-		}
-	}
-
-	this.notify();
-};
-
-/* Merge a list of nodes and edges into the current graph. eg.
-var o = {
-	nodes: [
-		{id: 123, data: {type: 'user', userid: 123, displayname: 'aaa'}},
-		{id: 234, data: {type: 'user', userid: 234, displayname: 'bbb'}}
-	],
-	edges: [
-		{from: 0, to: 1, type: 'submitted_design', directed: true, data: {weight: }}
-	]
-}
-*/
-Graph.prototype.merge = function(data) {
-	var nodes = [];
-	data.nodes.forEach(function(n) {
-		nodes.push(this.addNode(new Node(n.id, n.data)));
-	}, this);
-
-	data.edges.forEach(function(e) {
-		var from = nodes[e.from];
-		var to = nodes[e.to];
-
-		var id = (e.directed)
-			? (e.type + "-" + from.id + "-" + to.id)
-			: (from.id < to.id) // normalise id for non-directed edges
-				? e.type + "-" + from.id + "-" + to.id
-				: e.type + "-" + to.id + "-" + from.id;
-
-		var edge = this.addEdge(new Edge(id, from, to, e.data));
-		edge.data.type = e.type;
-	}, this);
-};
-
-Graph.prototype.filterNodes = function(fn) {
-	var tmpNodes = this.nodes.slice();
-	tmpNodes.forEach(function(n) {
-		if (!fn(n)) {
-			this.removeNode(n);
-		}
-	}, this);
-};
-
-Graph.prototype.filterEdges = function(fn) {
-	var tmpEdges = this.edges.slice();
-	tmpEdges.forEach(function(e) {
-		if (!fn(e)) {
-			this.removeEdge(e);
-		}
-	}, this);
-};
-
-
-Graph.prototype.addGraphListener = function(obj) {
-	this.eventListeners.push(obj);
-};
-
-Graph.prototype.notify = function() {
-	this.eventListeners.forEach(function(obj){
-		obj.graphChanged();
-	});
-};
-
-// -----------
 export const Layout = {
 	ForceDirected: function(graph, stiffness, repulsion, damping, minEnergyThreshold) {
 		this.graph = graph;
@@ -361,7 +266,7 @@ Layout.ForceDirected.prototype.spring = function(edge) {
 		}
 
 		var to = this.graph.getEdges(edge.target, edge.source);
-		from.forEach(function(e){
+		to.forEach(function(e){
 			if (existingSpring === false && e.id in this.edgeSprings) {
 				existingSpring = this.edgeSprings[e.id];
 			}
@@ -408,8 +313,8 @@ Layout.ForceDirected.prototype.eachSpring = function(callback) {
 Layout.ForceDirected.prototype.applyCoulombsLaw = function() {
 	var nodes = this.graph.nodes;
 	var rep = this.repulsion;
-	var i = 0, j = 0, x = 0, y = 0, z = 0, absx = 0, absy = 0, absz = 0, maxxyz = 0, k = 0;
-	var magnitude = 0, distance = 0, factor = 0;
+	var i = 0, j = 0, x = 0, y = 0, z = 0;
+	var factor = 0, r2 = 0;
 	var x1 = 0, y1 = 0, z1 = 0, m1 = 0, ax1 = 0, ay1 = 0, az1 = 0;
 	var len = nodes.length;
 	var xs = new Array(nodes.length);
@@ -422,7 +327,8 @@ Layout.ForceDirected.prototype.applyCoulombsLaw = function() {
 	var points = new Array(nodes.length);
 	var point;
 
-	//console.time('prep');
+	var sum = 0;
+
 	for (i = 0; i < len; i++) {
 		point = this.point(nodes[i]);
 		xs[i] = point.p.x;
@@ -434,9 +340,7 @@ Layout.ForceDirected.prototype.applyCoulombsLaw = function() {
 		azs[i] = point.a.z;
 		points[i] = point;
 	}
-	//console.timeEnd('prep');
 
-	//console.time('coulombs');
 	for (i = 0; i < len; i++) {
 		x1 = xs[i];
 		y1 = ys[i];
@@ -450,10 +354,11 @@ Layout.ForceDirected.prototype.applyCoulombsLaw = function() {
 			x = x1 - xs[j];
 			y = y1 - ys[j];
 			z = z1 - zs[j];
-			
-			factor = 4 * rep / (x * x + y * y + z * z);
+			r2 = x * x + y * y + z * z + 0.1;
+			sum = (x > 0 ? x : -x) + (y > 0 ? y : -y) + (z > 0 ? z : -z);
 
-			// apply force to each end point
+			factor = 4 * rep / (1.73205081 * sum * r2);
+
 			axs[j] += - x * factor / ms[j];
 			ays[j] += - y * factor / ms[j];
 			azs[j] += - z * factor / ms[j];
@@ -466,33 +371,30 @@ Layout.ForceDirected.prototype.applyCoulombsLaw = function() {
 		ays[i] += ay1;
 		azs[i] += az1;
 	}
-	//console.timeEnd('coulombs');
 
-	//console.time('post');
 	for (i = 0; i < len; i++) {
 		points[i].a.x = axs[i];
 		points[i].a.y = ays[i];
 		points[i].a.z = azs[i];
 	}
-	//console.timeEnd('post');
 };
 
 Layout.ForceDirected.prototype.applyHookesLaw = function() {
 	this.eachSpring(function(spring){
 		var d = spring.point2.p.subtract(spring.point1.p); // the direction of the spring
 		var displacement = spring.length - d.magnitude();
-		var direction = d.normalise();
-
+		var direction = d.normalize();
+		var multiplier = spring.k * displacement * 0.5;
 		// apply force to each end point
-		spring.point1.applyForce(direction.multiply(spring.k * displacement * -0.5));
-		spring.point2.applyForce(direction.multiply(spring.k * displacement * 0.5));
+		spring.point1.applyForce(direction.multiply(-multiplier));
+		spring.point2.applyForce(direction.multiply(multiplier));
 	});
 };
 
 Layout.ForceDirected.prototype.attractToCentre = function() {
 	this.eachNode(function(node, point) {
-		var direction = point.p.multiply(-1.0);
-		point.applyForce(direction.multiply(this.repulsion / 50.0));
+		var direction = point.p.multiply(-this.repulsion / 50.0);
+		point.applyForce(direction);
 	});
 };
 
@@ -501,8 +403,9 @@ Layout.ForceDirected.prototype.updateVelocity = function(timestep) {
 	this.eachNode(function(node, point) {
 		// Is this, along with updatePosition below, the only places that your
 		// integration code exist?
-		point.v = point.v.add(point.a.multiply(timestep)).multiply(this.damping);
-		point.a = new Vector(0,0,0);
+		var dv = point.a.multiply(timestep).limit(100);
+		point.v = point.v.add(dv).multiply(this.damping);
+		point.a = new Vector(0, 0, 0);
 	});
 };
 
@@ -583,46 +486,6 @@ Layout.ForceDirected.prototype.nearest = function(pos) {
 	return min;
 };
 
-// Vector
-export const Vector = function(x, y, z) {
-	this.x = x;
-	this.y = y;
-	this.z = z;
-};
-
-Vector.random = function() {
-	console.log('random');
-	return new Vector(
-		10.0 * (random() - 0.5),
-		10.0 * (random() - 0.5),
-		10.0 * (random() - 0.5)
-	);
-};
-
-Vector.prototype.add = function(v2) {
-	return new Vector(this.x + v2.x, this.y + v2.y, this.z + v2.z);
-};
-
-Vector.prototype.subtract = function(v2) {
-	return new Vector(this.x - v2.x, this.y - v2.y, this.z - v2.z);
-};
-
-Vector.prototype.multiply = function(n) {
-	return new Vector(this.x * n, this.y * n, this.z * n);
-};
-
-Vector.prototype.divide = function(n) {
-	return new Vector((this.x / n) || 0, (this.y / n) || 0, (this.z / n) || 0); // Avoid divide by zero errors..
-};
-
-Vector.prototype.magnitude = function() {
-	return Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z);
-};
-
-Vector.prototype.normalise = function() {
-	return this.divide(this.magnitude());
-};
-
 // Point
 Layout.ForceDirected.Point = function(position, mass) {
 	this.p = position; // position
@@ -641,22 +504,4 @@ Layout.ForceDirected.Spring = function(point1, point2, length, k) {
 	this.point2 = point2;
 	this.length = length; // spring length at rest
 	this.k = k; // spring constant (See Hooke's law) .. how stiff the spring is
-};
-
-// Layout.ForceDirected.Spring.prototype.distanceToPoint = function(point)
-// {
-// 	// hardcore vector arithmetic.. ohh yeah!
-// 	// .. see http://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment/865080#865080
-// 	var n = this.point2.p.subtract(this.point1.p).normalise().normal();
-// 	var ac = point.p.subtract(this.point1.p);
-// 	return Math.abs(ac.x * n.x + ac.y * n.y);
-// };
-
-var isEmpty = function(obj) {
-	for (var k in obj) {
-		if (obj.hasOwnProperty(k)) {
-			return false;
-		}
-	}
-	return true;
 };
