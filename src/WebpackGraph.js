@@ -7,7 +7,7 @@ import TouchableContainer from './TouchableContainer';
 import MouseInput from './MouseInput';
 
 async function getDefaultStats() {
-  const result = await fetch('stats.json');
+  const result = await fetch('static/stats.json');
 
   return await result.json();
 }
@@ -178,7 +178,7 @@ class WebpackGraphTree extends PureComponent {
                 fog={false}
               >
                 <texture
-                  url='Space.jpg'
+                  url='static/Space.jpg'
                   wrapS={THREE.RepeatWrapping}
                   wrapT={THREE.RepeatWrapping}
                   anisotropy={16}
@@ -365,17 +365,17 @@ export default class WebpackGraph extends PureComponent {
 
     getDefaultStats().then(stats => this.setState({ stats }));
 
-    new THREE.FontLoader().load('/typeface.json',
-      font => this.setState({ font }),
-      undefined,
-      (e) => console.error('ERROR', e)
-    );
+    // new THREE.FontLoader().load('static/typeface.json',
+    //   font => this.setState({ font }),
+    //   undefined,
+    //   (e) => console.error('ERROR', e)
+    // );
 
-    new THREE.TextureLoader().load('ball.png',
+    new THREE.TextureLoader().load('static/ball.png',
       pointTexture => this.setState({ pointTexture })
     );
 
-    new THREE.TextureLoader().load('glow.png',
+    new THREE.TextureLoader().load('static/glow.png',
       glowTexture => this.setState({ glowTexture })
     );
   }

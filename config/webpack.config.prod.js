@@ -136,6 +136,6 @@ module.exports = {
       }
     }),
     new ExtractTextPlugin('static/css/[name].[contenthash:8].css'),
-    new CopyWebpackPlugin([{ from: 'stats.json', to: 'stats.json' }])
+    new CopyWebpackPlugin([{ from: 'static', to: 'static' }])
   ]
 };

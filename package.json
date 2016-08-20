@@ -66,7 +66,7 @@
   "scripts": {
     "start": "node ./scripts/start.js",
     "build": "node ./scripts/build.js",
-    "stats": "NODE_ENV=production webpack --profile --json --config config/webpack.config.prod.js > stats.json",
+    "stats": "NODE_ENV=production webpack --profile --json --config config/webpack.config.prod.js > static/stats.json",
     "gh": "git subtree push --prefix build origin gh-pages"
   },
   "eslintConfig": {
