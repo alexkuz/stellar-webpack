@@ -502,7 +502,7 @@ export default class WebpackGraph extends PureComponent {
           <span style={{ fontSize: 30 }}>Stellar Webpack</span>
         </div>
         {(hoverIndex !== -1) && nodes[hoverIndex] &&
-          <div className='absolute right-0 top-0 mt3 mr3 z1 white'>
+          <div className='absolute right-0 top-0 mt4 mr3 z1 white'>
             {nodes[hoverIndex].id}
           </div>
         }
