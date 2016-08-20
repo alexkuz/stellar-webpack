@@ -4,6 +4,7 @@ import React3 from 'react-three-renderer';
 import THREE from 'three';
 import uniq from 'lodash.uniq';
 import TouchableContainer from './TouchableContainer';
+import MouseInput from './MouseInput';
 
 async function getDefaultStats() {
   const result = await fetch('stats.json');
@@ -55,22 +56,27 @@ const getEdgeColors = edges => {
 
   for (var i = 0; i < len; i++) {
     const { p1, p2 } = edges[i];
-    colors[2*i] = getColor(p1, 0.8, 0.7);
-    colors[2*i + 1] = getColor(p2, 0.8, 0.7);
+    colors[2*i] = getColor(p1, 0, 0.3);
+    colors[2*i + 1] = getColor(p2, 0.9, 0.7);
   }
   
   return colors;
 }
 
-const getNodeColors = nodes =>
-  nodes.map(node => getColor(node.p, 1, 0.9)); 
+const getNodeColors = (nodes, s, l, hoverIndex) =>
+  nodes.map(
+    (node, index) => index === hoverIndex ? getColor(node.p, 1, 1) : getColor(node.p, s, l)
+  ); 
 
 class WebpackGraphTree extends PureComponent {
   state = {
     nodeVertices: [],
     edgeVertices: [],
     nodeColors: [],
+    nodeGlowColors: [],
     edgeColors: [],
+    scale: new THREE.Vector3(1, 1, 1),
+    hoverIndex: -1
   };
 
   cameraPosition = new THREE.Vector3(0, 0, 1000);
@@ -82,10 +88,23 @@ class WebpackGraphTree extends PureComponent {
 
   componentDidMount() {
     this.updateVertices({}, this.props);
+
+    document.addEventListener('mousemove', this.handleMouseMove);
   }
 
   componentWillReceiveProps(nextProps) {
     this.updateVertices(this.props, nextProps);
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (this.state.hoverIndex !== prevState.hoverIndex) {
+      this.setState({
+        nodeColors: getNodeColors(this.props.nodes, 1, 0.95, this.state.hoverIndex),
+        nodeGlowColors: getNodeColors(this.props.nodes, 1, 0.7, this.state.hoverIndex)
+      });
+
+      this.props.onHoverIndexChanged(this.state.hoverIndex);
+    }
   }
 
   updateVertices(props, nextProps) {
@@ -93,28 +112,29 @@ class WebpackGraphTree extends PureComponent {
       return !keys.find(key => nextProps[key] !== this.props[key]);
     };
 
-    let factor = 0;
-
-    if (!areEqual('edges', 'nodes', 'zoom')) {
-      factor = Math.pow(2, nextProps.zoom / 2) / Math.pow(nextProps.edges.length, 0.6);
-    }
-
-    if (!areEqual('edges', 'zoom')) {
-      
+    if (!areEqual('zoom', 'edges')) {
+      const scale = Math.pow(2, nextProps.zoom / 2) / Math.pow(nextProps.edges.length, 0.6);
       this.setState({
-        edgeVertices: getEdgeVertices(nextProps.edges, factor)
+        scale: new THREE.Vector3(scale, scale, scale)
       });
     }
 
-    if (!areEqual('nodes', 'zoom')) {
+    if (!areEqual('edges')) {
       this.setState({
-        nodeVertices: getNodeVertices(nextProps.nodes, factor)
+        edgeVertices: getEdgeVertices(nextProps.edges, 1)
       });
     }
 
     if (!areEqual('nodes')) {
       this.setState({
-        nodeColors: getNodeColors(nextProps.nodes)
+        nodeVertices: getNodeVertices(nextProps.nodes, 1)
+      });
+    }
+
+    if (!areEqual('nodes')) {
+      this.setState({
+        nodeColors: getNodeColors(nextProps.nodes, 1, 0.95, this.state.hoverIndex),
+        nodeGlowColors: getNodeColors(nextProps.nodes, 1, 0.7, this.state.hoverIndex)
       });
     }
 
@@ -126,81 +146,199 @@ class WebpackGraphTree extends PureComponent {
   }
 
   render() {
-    const { width, height, rotation, onAnimate } = this.props;
-    const { nodeVertices, nodeColors, edgeVertices, edgeColors } = this.state;
+    const { width, height, rotation, pointTexture, glowTexture } = this.props;
+    const { nodeVertices, nodeColors, nodeGlowColors, edgeVertices, edgeColors, scale } = this.state;
 
     return (
-      <React3
-        mainCamera='camera' // this points to the perspectiveCamera which has the name set to "camera" below
-        width={width}
-        height={height}
-        onAnimate={onAnimate}
-        key={nodeVertices.length}
-      >
-        <scene>
-          <perspectiveCamera
-            name='camera'
-            fov={75}
-            aspect={width / height}
-            near={0.1}
-            far={3000}
-            position={this.cameraPosition}
+      <div ref='container' style={{ width, height }}>
+        <React3
+          mainCamera='camera' // this points to the perspectiveCamera which has the name set to "camera" below
+          width={width}
+          height={height}
+          onAnimate={this.handleAnimate}
+          key={nodeVertices.length}
+        >
+          <module
+            ref='mouseInput'
+            descriptor={MouseInput}
           />
-          <pointLight
-            color={0xffffff}
-            position={this.cameraPosition}
-          />
-          {/*
-          <mesh
-            position={new THREE.Vector3(-60, 33, 940)}
+          <scene
+            ref='scene'
+            fog={new THREE.FogExp2(0x000022, 0.0005, 2000)}
           >
-            <textGeometry
-              size={5}
-              bevelSize={0.1}
-              height={1}
-              bevelThickness={0.1}
-              bevelEnabled
-              font={font}
-              text='Stellar Webpack'
+            <mesh
+              position={new THREE.Vector3(0, 0, 0)}
+              rotation={rotation}
+            >
+              <sphereGeometry
+                radius={2000}
+              />
+              <meshLambertMaterial
+                side={THREE.BackSide}
+                fog={false}
+              >
+                <texture
+                  url='Space.jpg'
+                  wrapS={THREE.RepeatWrapping}
+                  wrapT={THREE.RepeatWrapping}
+                  anisotropy={16}
+                />
+              </meshLambertMaterial>
+            </mesh>
+            <perspectiveCamera
+              name='camera'
+              ref='camera'
+              fov={75}
+              aspect={width / height}
+              near={0.1}
+              far={3000}
+              position={this.cameraPosition}
             />
-            <meshPhongMaterial
-              color={0x3366FF}
-              side={THREE.DoubleSide}
+            <pointLight
+              color={0xffffff}
+              position={this.cameraPosition}
             />
-          </mesh>
-        */}
-          <points
-            position={new THREE.Vector3(0, 0, 0)}
-            rotation={rotation}
-            scale={new THREE.Vector3(1, 1, 1)}
-          >
-            <geometry
-              vertices={nodeVertices}
-              colors={nodeColors}
-            />
-            <pointsMaterial
-              size={6}
-              sizeAttenuation={false}
-              vertexColors={THREE.VertexColors}
-            />
-          </points>
-          <lineSegments
-            position={new THREE.Vector3(0, 0, 0)}
-            rotation={rotation}
-            scale={new THREE.Vector3(1, 1, 1)}
-          >
-            <geometry
-              vertices={edgeVertices}
-              colors={edgeColors}
-            />
-            <lineBasicMaterial
-              linewidth={2}
-              vertexColors={THREE.VertexColors}
-            />
-          </lineSegments>
-        </scene>
-      </React3>
+            {/*
+            <mesh
+              position={new THREE.Vector3(-60, 33, 940)}
+            >
+              <textGeometry
+                size={5}
+                bevelSize={0.1}
+                height={1}
+                bevelThickness={0.1}
+                bevelEnabled
+                font={font}
+                text='Stellar Webpack'
+              />
+              <meshPhongMaterial
+                color={0x3366FF}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          */}
+            <group rotation={rotation} scale={scale}>
+              <points>
+                <geometry
+                  // glowing for dummies (true shader glowing should be used instead)
+                  vertices={nodeVertices}
+                  colors={nodeGlowColors}
+                />
+                <pointsMaterial
+                  size={50}
+                  map={glowTexture}
+                  vertexColors={THREE.VertexColors}
+                  alphaTest={0.01}
+                  opacity={0.07}
+                  transparent
+                  depthTest={false}
+                />
+              </points>
+              <points>
+                <geometry
+                  vertices={nodeVertices}
+                  colors={nodeGlowColors}
+                />
+                <pointsMaterial
+                  size={44}
+                  map={glowTexture}
+                  vertexColors={THREE.VertexColors}
+                  alphaTest={0.01}
+                  opacity={0.07}
+                  transparent
+                  depthTest={false}
+                />
+              </points>
+              <points>
+                <geometry
+                  vertices={nodeVertices}
+                  colors={nodeGlowColors}
+                />
+                <pointsMaterial
+                  size={38}
+                  map={glowTexture}
+                  vertexColors={THREE.VertexColors}
+                  alphaTest={0.01}
+                  opacity={0.07}
+                  transparent
+                  depthTest={false}
+                />
+              </points>
+              <points>
+                <geometry
+                  vertices={nodeVertices}
+                  colors={nodeGlowColors}
+                />
+                <pointsMaterial
+                  size={32}
+                  map={glowTexture}
+                  vertexColors={THREE.VertexColors}
+                  alphaTest={0.01}
+                  opacity={0.07}
+                  transparent
+                  depthTest={false}
+                />
+              </points>
+              <points ref='points'>
+                <geometry
+                  vertices={nodeVertices}
+                  colors={nodeColors}
+                />
+                <pointsMaterial
+                  size={32}
+                  map={pointTexture}
+                  vertexColors={THREE.VertexColors}
+                  transparent
+                  alphaTest={0.5}
+                />
+              </points>
+              <lineSegments>
+                <geometry
+                  vertices={edgeVertices}
+                  colors={edgeColors}
+                />
+                <lineBasicMaterial
+                  linewidth={2}
+                  vertexColors={THREE.VertexColors}
+                  opacity={0.5}
+                  transparent
+                />
+              </lineSegments>
+            </group>
+          </scene>
+        </React3>
+      </div>
     );
+  }
+
+  handleAnimate = () => {
+    const mouseInput = this.refs.mouseInput;
+
+    if (!mouseInput.isReady()) {
+      mouseInput.ready(this.refs.scene, this.refs.container, this.refs.camera);
+      mouseInput.setActive(false);
+    }
+
+    this.props.onAnimate();
+  }
+
+  handleMouseMove = event => {
+    const mouseInput = this.refs.mouseInput;
+
+    const intersections = mouseInput.intersectObject(
+      new THREE.Vector2(event.clientX, event.clientY),
+      this.refs.points
+    );
+
+    if (intersections.length) {
+      this.setState({
+        hoverIndex: intersections[0].index
+      });
+    } else {
+      this.setState({
+        hoverIndex: -1
+      });
+    }
   }
 }
 
@@ -228,9 +366,17 @@ export default class WebpackGraph extends PureComponent {
     getDefaultStats().then(stats => this.setState({ stats }));
 
     new THREE.FontLoader().load('/typeface.json',
-      font => !console.log('LOADED', font) && this.setState({ font }),
+      font => this.setState({ font }),
       undefined,
-      (e) => console.log('ERROR', e)
+      (e) => console.error('ERROR', e)
+    );
+
+    new THREE.TextureLoader().load('ball.png',
+      pointTexture => this.setState({ pointTexture })
+    );
+
+    new THREE.TextureLoader().load('glow.png',
+      glowTexture => this.setState({ glowTexture })
     );
   }
 
@@ -238,7 +384,11 @@ export default class WebpackGraph extends PureComponent {
     this.setState({
       width: window.innerWidth,
       height: window.innerHeight
-    })
+    });
+
+    if (this.refs.mouseInput) {
+      this.refs.mouseInput.containerResized();
+    }
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -262,7 +412,7 @@ export default class WebpackGraph extends PureComponent {
           rotationX + (targetRotationY - rotationX) * 0.05,
           rotationY + (targetRotationX - rotationY) * 0.05,
           0
-        ),
+        )
       });
     } else {
       this.setState({
@@ -306,23 +456,31 @@ export default class WebpackGraph extends PureComponent {
   }
 
   render() {
-    const { width, height, edges, nodes, scale, font, zoom,
-            targetRotationX, targetRotationY, rotation, started } = this.state;
-    const inputStyle = { backgroundColor: 'rgba(200, 255, 255, 0.6)' };
-    const buttonStyle = { ...inputStyle, cursor: 'pointer' };
+    const { width, height, edges, nodes, scale, font, zoom, pointTexture, glowTexture,
+            targetRotationX, targetRotationY, rotation, started, hoverIndex } = this.state;
+    const roundButtonStyle = { cursor: 'pointer', width: '2rem', height: '2rem' };
+    const buttonStyle = { cursor: 'pointer' };
 
     // if (!font) {
     //   return null;
     // }
-    
+
+    if (!pointTexture || !glowTexture) {
+      return null;
+    }
+
+    const rotX = (rotation.x / Math.PI) % 2;
+
     return (
       <div className='absolute left-0 top-0' style={{ width: '100vw', height: '100vh' }}>
         <TouchableContainer
           width={width}
           height={height}
           onUpdateRotation={this.handleUpdateRotation}
+          onZoom={this.handleZoom}
           targetRotationX={targetRotationX}
           targetRotationY={targetRotationY}
+          inverseX={Math.round(rotX) % 2}
         >
           <WebpackGraphTree
             width={width}
@@ -335,34 +493,41 @@ export default class WebpackGraph extends PureComponent {
             onAnimate={this.handleAnimate}
             zoom={zoom}
             font={font}
+            pointTexture={pointTexture}
+            glowTexture={glowTexture}
+            onHoverIndexChanged={hoverIndex => this.setState({ hoverIndex })}
           />
         </TouchableContainer>
         <div className='absolute left-0 top-0 mt3 ml3 z1 white'>
           <span style={{ fontSize: 30 }}>Stellar Webpack</span>
         </div>
+        {(hoverIndex !== -1) && nodes[hoverIndex] &&
+          <div className='absolute right-0 top-0 mt3 mr3 z1 white'>
+            {nodes[hoverIndex].id}
+          </div>
+        }
         <div className='absolute bottom-0 left-0 white z1 clearfix mb2 ml2' style={{ width: '20rem' }}>
           <div className='clearfix'>
             <div className='col col-4 right-align pr2 mt2 pt1'>Zoom:</div>
             <div className='col col-8 left-align mt2'>
               <input
-                className='pl2 pt1 pr2 pb1 border-none rounded'
+                className='pl2 pt1 pr2 pb1 rounded bg-black white border'
                 value={zoom}
                 type='number'
                 min={1}
                 max={100}
                 onChange={e => this.setState({ zoom: parseInt(e.target.value, 10) })}
-                style={inputStyle}
               />
               <button
-                className='ml1 border-none pl1 pr1 circle'
-                style={buttonStyle}
+                className='ml1 pl1 pr1 circle bg-black white border'
+                style={roundButtonStyle}
                 onClick={() => this.setState({ zoom: Math.max(0, zoom - 1) })}
               >
                 <span style={{ fontSize: 16 }}>-</span>
               </button>
               <button
-                className='ml1 border-none pl1 pr1 circle'
-                style={buttonStyle}
+                className='ml1 pl1 pr1 circle bg-black white border'
+                style={roundButtonStyle}
                 onClick={() => this.setState({ zoom: Math.min(100, zoom + 1) })}
               >
                 <span style={{ fontSize: 16 }}>+</span>
@@ -375,7 +540,6 @@ export default class WebpackGraph extends PureComponent {
               <input
                 type='file'
                 className='pl2 pt1 pr2 pb1 border-none rounded'
-                style={inputStyle}
                 onChange={this.handleSelectFile}
               />
             </div>
@@ -390,7 +554,7 @@ export default class WebpackGraph extends PureComponent {
             <div className='col col-4 right-align pr2 mt2 pt1'>Evolution:</div>
             <div className='col col-8 left-align mt2'>
               <button
-                className='pt1 pb1 pl2 pr2 border-none rounded'
+                className='pt1 pb1 pl2 pr2 rounded bg-black white border'
                 onClick={this.toggleEvolution}
                 style={buttonStyle}
               >
@@ -401,6 +565,12 @@ export default class WebpackGraph extends PureComponent {
         </div>
       </div>
     );
+  }
+
+  handleZoom = zoomDelta => {
+    const zoom = Math.min(100, Math.max(1, this.state.zoom + zoomDelta));
+
+    this.setState({ zoom });
   }
 
   handleUpdateRotation = ({ targetRotationX, targetRotationY }) => {

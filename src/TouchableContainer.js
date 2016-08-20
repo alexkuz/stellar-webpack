@@ -24,11 +24,16 @@ export default class TouchableContainer extends PureComponent {
       <div
         onMouseDown={this.handleMouseDown}
         onTouchStart={this.handleTouchStart}
+        onWheel={this.handleWheel}
         style={{ width, height }}
       >
         {children}
       </div>
     );
+  }
+
+  handleWheel = event => {
+    this.props.onZoom(- event.deltaY / 100);
   }
 
   handleTouchStart = event => {
@@ -91,22 +96,23 @@ export default class TouchableContainer extends PureComponent {
   };
 
   handleMouseMove = (event) => {
-    const { width, height } = this.props;
+    const { width, height, inverseX } = this.props;
 
     const windowHalfX = width / 2;
     const windowHalfY = height / 2;
+    const signX = inverseX ? -1 : 1;
 
     this.mouseX = event.clientX - windowHalfX;
     this.mouseY = event.clientY - windowHalfY;
     this.targetRotationX = this.targetRotationOnMouseDownX +
-      (this.mouseX - this.mouseXOnMouseDown) * 0.02;
+      signX * (this.mouseX - this.mouseXOnMouseDown) * 0.02;
     this.targetRotationY = this.targetRotationOnMouseDownY +
       (this.mouseY - this.mouseYOnMouseDown) * 0.02;
 
     this.props.onUpdateRotation({
       targetRotationX: this.targetRotationX,
       targetRotationY: this.targetRotationY
-    })
+    });
   };
 
   handleMouseUp = () => {
