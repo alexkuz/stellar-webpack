@@ -56,16 +56,17 @@ export default class TouchableContainer extends PureComponent {
     if (event.touches.length === 1) {
       event.preventDefault();
 
-      const { width, height } = this.props;
+      const { width, height, inverseX } = this.props;
 
       const windowHalfX = width / 2;
       const windowHalfY = height / 2;
+      const signX = inverseX ? -1 : 1;
 
       this.mouseX = event.touches[0].pageX - windowHalfX;
       this.mouseY = event.touches[0].pageY - windowHalfY;
 
       this.targetRotationX = this.targetRotationOnMouseDownX +
-        (this.mouseX - this.mouseXOnMouseDown) * 0.05;
+        signX * (this.mouseX - this.mouseXOnMouseDown) * 0.05;
       this.targetRotationY = this.targetRotationOnMouseDownY +
         (this.mouseY - this.mouseYOnMouseDown) * 0.05;
 
