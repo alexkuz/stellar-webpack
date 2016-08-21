@@ -75,7 +75,7 @@ class WebpackGraphTree extends PureComponent {
     nodeColors: [],
     nodeGlowColors: [],
     edgeColors: [],
-    scale: new THREE.Vector3(1, 1, 1),
+    scale: 1000, // new THREE.Vector3(1, 1, 1),
     hoverIndex: -1
   };
 
@@ -94,6 +94,13 @@ class WebpackGraphTree extends PureComponent {
 
   componentWillReceiveProps(nextProps) {
     this.updateVertices(this.props, nextProps);
+
+    if (this.props.width !== nextProps.width ||
+      this.props.height !== nextProps.height) {
+      if (this.refs.mouseInput) {
+        this.refs.mouseInput.containerResized();
+      }
+    }
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -113,9 +120,10 @@ class WebpackGraphTree extends PureComponent {
     };
 
     if (!areEqual('zoom', 'edges')) {
-      const scale = Math.pow(2, nextProps.zoom / 2) / Math.pow(nextProps.edges.length, 0.6);
+      //const scale = Math.pow(2, nextProps.zoom / 2) / Math.pow(nextProps.edges.length, 0.6);
+      const scale = 100 / Math.pow(2, nextProps.zoom / 2) * Math.pow(nextProps.edges.length, 0.6);
       this.setState({
-        scale: new THREE.Vector3(scale, scale, scale)
+        scale //: new THREE.Vector3(scale, scale, scale)
       });
     }
 
@@ -149,6 +157,9 @@ class WebpackGraphTree extends PureComponent {
     const { width, height, rotation, pointTexture, glowTexture } = this.props;
     const { nodeVertices, nodeColors, nodeGlowColors, edgeVertices, edgeColors, scale } = this.state;
 
+    this.cameraPosition = new THREE.Vector3(0, 0, scale);
+    const groupScale = new THREE.Vector3(50, 50, 50);
+
     return (
       <div ref='container' style={{ width, height }}>
         <React3
@@ -164,14 +175,14 @@ class WebpackGraphTree extends PureComponent {
           />
           <scene
             ref='scene'
-            fog={new THREE.FogExp2(0x000022, 0.0005, 2000)}
+            fog={new THREE.FogExp2(0x000022, 0.0004, 2000)}
           >
             <mesh
               position={new THREE.Vector3(0, 0, 0)}
               rotation={rotation}
             >
               <sphereGeometry
-                radius={2000}
+                radius={5000}
               />
               <meshLambertMaterial
                 side={THREE.BackSide}
@@ -191,38 +202,30 @@ class WebpackGraphTree extends PureComponent {
               fov={75}
               aspect={width / height}
               near={0.1}
-              far={3000}
+              far={10000}
               position={this.cameraPosition}
             />
             <pointLight
               color={0xffffff}
               position={this.cameraPosition}
             />
-            {/*
-            <mesh
-              position={new THREE.Vector3(-60, 33, 940)}
-            >
-              <textGeometry
-                size={5}
-                bevelSize={0.1}
-                height={1}
-                bevelThickness={0.1}
-                bevelEnabled
-                font={font}
-                text='Stellar Webpack'
+            <resources>
+              <geometry
+                resourceId='glowGeometry'
+                vertices={nodeVertices}
+                colors={nodeGlowColors}
               />
-              <meshPhongMaterial
-                color={0x3366FF}
-                side={THREE.DoubleSide}
+              <geometry
+                resourceId='starsGeometry'
+                vertices={nodeVertices}
+                colors={nodeColors}
               />
-            </mesh>
-          */}
-            <group rotation={rotation} scale={scale}>
+            </resources>
+            <group rotation={rotation} scale={groupScale}>
               <points>
-                <geometry
+                <geometryResource
                   // glowing for dummies (true shader glowing should be used instead)
-                  vertices={nodeVertices}
-                  colors={nodeGlowColors}
+                  resourceId='glowGeometry'
                 />
                 <pointsMaterial
                   size={50}
@@ -235,9 +238,8 @@ class WebpackGraphTree extends PureComponent {
                 />
               </points>
               <points>
-                <geometry
-                  vertices={nodeVertices}
-                  colors={nodeGlowColors}
+                <geometryResource
+                  resourceId='glowGeometry'
                 />
                 <pointsMaterial
                   size={44}
@@ -250,9 +252,8 @@ class WebpackGraphTree extends PureComponent {
                 />
               </points>
               <points>
-                <geometry
-                  vertices={nodeVertices}
-                  colors={nodeGlowColors}
+                <geometryResource
+                  resourceId='glowGeometry'
                 />
                 <pointsMaterial
                   size={38}
@@ -265,9 +266,8 @@ class WebpackGraphTree extends PureComponent {
                 />
               </points>
               <points>
-                <geometry
-                  vertices={nodeVertices}
-                  colors={nodeGlowColors}
+                <geometryResource
+                  resourceId='glowGeometry'
                 />
                 <pointsMaterial
                   size={32}
@@ -280,9 +280,8 @@ class WebpackGraphTree extends PureComponent {
                 />
               </points>
               <points ref='points'>
-                <geometry
-                  vertices={nodeVertices}
-                  colors={nodeColors}
+                <geometryResource
+                  resourceId='starsGeometry'
                 />
                 <pointsMaterial
                   size={32}
@@ -325,6 +324,10 @@ class WebpackGraphTree extends PureComponent {
   handleMouseMove = event => {
     const mouseInput = this.refs.mouseInput;
 
+    if (!mouseInput.isReady()) {
+      return;
+    }
+
     const intersections = mouseInput.intersectObject(
       new THREE.Vector2(event.clientX, event.clientY),
       this.refs.points
@@ -348,7 +351,7 @@ export default class WebpackGraph extends PureComponent {
     scale: 30,
     edges: [],
     nodes: [],
-    zoom: 20,
+    zoom: 5,
     width: window.innerWidth,
     height: window.innerHeight,
     rotation: new THREE.Euler(),
@@ -385,10 +388,6 @@ export default class WebpackGraph extends PureComponent {
       width: window.innerWidth,
       height: window.innerHeight
     });
-
-    if (this.refs.mouseInput) {
-      this.refs.mouseInput.containerResized();
-    }
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -515,7 +514,7 @@ export default class WebpackGraph extends PureComponent {
                 value={zoom}
                 type='number'
                 min={1}
-                max={100}
+                max={15}
                 onChange={e => this.setState({ zoom: parseInt(e.target.value, 10) })}
               />
               <button

@@ -398,12 +398,25 @@ Layout.ForceDirected.prototype.attractToCentre = function() {
 	});
 };
 
-
 Layout.ForceDirected.prototype.updateVelocity = function(timestep) {
 	this.eachNode(function(node, point) {
+		if (point.m > 2) {
+			point.v = new Vector(0, 0, 0);
+			point.a = new Vector(0, 0, 0);
+			return;
+		}
+
 		// Is this, along with updatePosition below, the only places that your
 		// integration code exist?
-		var dv = point.a.multiply(timestep).limit(100);
+		var dv = point.a.multiply(timestep);
+
+
+		// Speed exceeds limit
+    if (dv.x * dv.x + dv.y * dv.y > 100 * 100) {
+			point.m *= 1.1;
+		}
+
+		dv = dv.limit(100);
 		point.v = point.v.add(dv).multiply(this.damping);
 		point.a = new Vector(0, 0, 0);
 	});
