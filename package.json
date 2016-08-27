@@ -60,6 +60,7 @@
     "lodash.uniq": "^4.5.0",
     "paths-js": "^0.4.4",
     "raf": "^3.2.0",
+    "rc-tooltip": "^3.4.2",
     "react": "^15.2.1",
     "react-art": "^0.15.1",
     "react-dom": "^15.2.1",
@@ -70,6 +71,9 @@
   "scripts": {
     "start": "node ./scripts/start.js",
     "build": "node ./scripts/build.js",
+    "preversion": "npm run lint",
+    "version": "npm run build && npm run stats && git add -A .",
+    "postversion": "git push --tags",
     "stats": "NODE_ENV=production webpack --profile --json --config config/webpack.config.prod.js > static/stats.json",
     "gh": "git subtree push --prefix build origin gh-pages"
   },
