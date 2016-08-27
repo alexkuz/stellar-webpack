@@ -272,7 +272,6 @@ class MouseInput extends Module {
   // noinspection JSUnusedGlobalSymbols
   intersectObject(mouseCoords, object, recursive = false) {
     const relativeMouseCoords = this._getRelativeMouseCoords(mouseCoords);
-
     const originalRay = this._raycaster.ray.clone();
 
     this._raycaster.setFromCamera(relativeMouseCoords, this._camera);

@@ -5,6 +5,36 @@ import THREE from 'three';
 import uniq from 'lodash.uniq';
 import TouchableContainer from './TouchableContainer';
 import MouseInput from './MouseInput';
+import debounce from 'lodash.debounce';
+
+function findDepth(v, e) {
+  const ex = e._x, ey = e._y, ez = e._z;
+  const x = v.x, y = v.y, z = v.z;
+
+  const c1 = Math.cos( ex / 2 );
+  const c2 = Math.cos( ey / 2 );
+  const c3 = Math.cos( ez / 2 );
+  const s1 = Math.sin( ex / 2 );
+  const s2 = Math.sin( ey / 2 );
+  const s3 = Math.sin( ez / 2 );
+
+  const qx = s1 * c2 * c3 + c1 * s2 * s3;
+  const qy = c1 * s2 * c3 - s1 * c2 * s3;
+  const qz = c1 * c2 * s3 + s1 * s2 * c3;
+  const qw = c1 * c2 * c3 - s1 * s2 * s3;
+
+
+  // calculate quat * vector
+
+  const ix =  qw * x + qy * z - qz * y;
+  const iy =  qw * y + qz * x - qx * z;
+  const iz =  qw * z + qx * y - qy * x;
+  const iw = - qx * x - qy * y - qz * z;
+
+  // calculate result * inverse quat
+
+  return iz * qw + iw * - qz + ix * - qy - iy * - qx;
+}
 
 async function getDefaultStats() {
   const result = await fetch('static/stats.json');
@@ -13,6 +43,16 @@ async function getDefaultStats() {
 }
 
 function getTreeFromStats(json) {
+  // return {
+  //   nodes: ['a', 'b', 'c', 'd', 'e'],
+  //   edges: [
+  //     ['a', 'b'],
+  //     ['a', 'c'],
+  //     ['a', 'd'],
+  //     ['a', 'e']
+  //   ]
+  // };
+
   const tree = json.modules.reduce((t, module) =>
     module.reasons.reduce((t1, reason) => ({
       nodes: [...t1.nodes, reason.module, module.name],
@@ -25,61 +65,81 @@ function getTreeFromStats(json) {
   };
 }
 
-const getColor = (p, s, l) => {
+const updateNodes = (vertices, colors, nodes, rotation, hoverIdx) => {
+  const depths = Array.from({ length: nodes.length });
+  const order = Array.from({ length: nodes.length }).map((_, idx) => idx);
+
+  const s = 1, l = 0.85;
+
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    depths[i] = findDepth(nodes[i].p, rotation);
+  }
+
+  order.sort((i1, i2) => depths[i1] - depths[i2]);
+
   const color = new THREE.Color();
-  const sum = (p.x + p.y + (p.z || 0 )) / 50;
+  let h, p;
 
-  color.setHSL(sum % 1, s, l);
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    p = nodes[order[i]].p;
 
-  return color;
-}
+    vertices[i * 3] = p.x;
+    vertices[i * 3 + 1] = p.y;
+    vertices[i * 3 + 2] = p.z;
 
-const getNodeVertices = (nodes, factor) =>
-  nodes.map(node => new THREE.Vector3(node.p.x * factor, node.p.y * factor, (node.p.z || 0) * factor))
+    h = (p.x + p.y + p.z) / 50;
+    color.setHSL(h % 1, order[i] === hoverIdx ? 1 : s, order[i] === hoverIdx ? 1 : l);
 
-const getEdgeVertices = (edges, factor) => {
-  const len = edges.length;
-  const points = new Array(len * 2);
-
-  for (var i = 0; i < len; i++) {
-    const { p1, p2 } = edges[i];
-    points[2*i] = new THREE.Vector3(p1.x * factor, p1.y * factor, (p1.z || 0) * factor);
-    points[2*i + 1] = new THREE.Vector3(p2.x * factor, p2.y * factor, (p2.z || 0) * factor);
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
   }
-  
-  return points;
+
+  return order;
 }
 
-const getEdgeColors = edges => {
-  const len = edges.length;
-  const colors = new Array(len * 2);
+const updateEdges = (vertices, colors, edges) => {
+  const color = new THREE.Color();
+  let h1, h2, p1, p2;
 
-  for (var i = 0; i < len; i++) {
-    const { p1, p2 } = edges[i];
-    colors[2*i] = getColor(p1, 0, 0.3);
-    colors[2*i + 1] = getColor(p2, 0.9, 0.7);
+  for (var i = edges.length - 1; i >= 0; i--) {
+    p1 = edges[i].p1;
+    p2 = edges[i].p2;
+
+    vertices[i * 6] = p1.x;
+    vertices[i * 6 + 1] = p1.y;
+    vertices[i * 6 + 2] = p1.z;
+    vertices[i * 6 + 3] = p2.x;
+    vertices[i * 6 + 4] = p2.y;
+    vertices[i * 6 + 5] = p2.z;
+
+    h1 = (p1.x + p1.y + p1.z) / 50;
+    color.setHSL(h1 % 1, 0, 0.3);
+
+    colors[i * 6] = color.r;
+    colors[i * 6 + 1] = color.g;
+    colors[i * 6 + 2] = color.b;
+
+    h2 = (p2.x + p2.y + p2.z) / 50;
+    color.setHSL(h2 % 1, 0.9, 0.7);
+
+    colors[i * 6 + 3] = color.r;
+    colors[i * 6 + 4] = color.g;
+    colors[i * 6 + 5] = color.b;
   }
-  
-  return colors;
-}
-
-const getNodeColors = (nodes, s, l, hoverIndex) =>
-  nodes.map(
-    (node, index) => index === hoverIndex ? getColor(node.p, 1, 1) : getColor(node.p, s, l)
-  ); 
+};
 
 class WebpackGraphTree extends PureComponent {
   state = {
-    nodeVertices: [],
-    edgeVertices: [],
-    nodeColors: [],
-    nodeGlowColors: [],
-    edgeColors: [],
-    scale: 1000, // new THREE.Vector3(1, 1, 1),
-    hoverIndex: -1
+    nodeVertices: new Float32Array(),
+    edgeVertices: new Float32Array(),
+    nodeColors: new Float32Array(),
+    edgeColors: new Float32Array(),
+    sortedNodeIdx: [],
+    cameraPosition: new THREE.Vector3(0, 0, 1000)
   };
 
-  cameraPosition = new THREE.Vector3(0, 0, 1000);
+  fog = new THREE.FogExp2(0x000022, 0.02);
 
   static defaultProps = {
     width: 1200,
@@ -89,28 +149,20 @@ class WebpackGraphTree extends PureComponent {
   componentDidMount() {
     this.updateVertices({}, this.props);
 
-    document.addEventListener('mousemove', this.handleMouseMove);
+    document.addEventListener('mousemove', this.debouncedHandleMouseMove);
   }
 
   componentWillReceiveProps(nextProps) {
     this.updateVertices(this.props, nextProps);
 
-    if (this.props.width !== nextProps.width ||
-      this.props.height !== nextProps.height) {
+  }
+
+  componentDidUpdate(prevProps) {
+    if (this.props.width !== prevProps.width ||
+      this.props.height !== prevProps.height) {
       if (this.refs.mouseInput) {
         this.refs.mouseInput.containerResized();
       }
-    }
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    if (this.state.hoverIndex !== prevState.hoverIndex) {
-      this.setState({
-        nodeColors: getNodeColors(this.props.nodes, 1, 0.95, this.state.hoverIndex),
-        nodeGlowColors: getNodeColors(this.props.nodes, 1, 0.7, this.state.hoverIndex)
-      });
-
-      this.props.onHoverIndexChanged(this.state.hoverIndex);
     }
   }
 
@@ -118,47 +170,54 @@ class WebpackGraphTree extends PureComponent {
     const areEqual = (...keys) => {
       return !keys.find(key => nextProps[key] !== this.props[key]);
     };
+    const hoverChanged = !areEqual('hoverIndex');
+
+    let { edgeVertices, nodeVertices, cameraPosition,
+          nodeColors, edgeColors, sortedNodeIdx } = this.state;
 
     if (!areEqual('zoom', 'edges')) {
-      //const scale = Math.pow(2, nextProps.zoom / 2) / Math.pow(nextProps.edges.length, 0.6);
-      const scale = 100 / Math.pow(2, nextProps.zoom / 2) * Math.pow(nextProps.edges.length, 0.6);
-      this.setState({
-        scale //: new THREE.Vector3(scale, scale, scale)
-      });
+      const scale = 20 / Math.pow(2, nextProps.zoom / 2) * Math.pow(nextProps.edges.length, 0.25);
+      cameraPosition = new THREE.Vector3(0, 0, scale);
     }
 
     if (!areEqual('edges')) {
-      this.setState({
-        edgeVertices: getEdgeVertices(nextProps.edges, 1)
-      });
+      const edges = nextProps.edges;
+
+      if (edgeVertices.length !== edges.length * 6) {
+        edgeVertices = new Float32Array(edges.length * 6);
+        edgeColors = new Float32Array(edges.length * 6);
+      }
+
+      updateEdges(edgeVertices, edgeColors, nextProps.edges);
     }
 
-    if (!areEqual('nodes')) {
-      this.setState({
-        nodeVertices: getNodeVertices(nextProps.nodes, 1)
-      });
+    if (!areEqual('nodes', 'rotation') || hoverChanged) {
+      // TODO: needs more optimization
+
+      const nodes = nextProps.nodes;
+
+      if (nodeVertices.length !== nodes.length * 3) {
+        nodeVertices = new Float32Array(nodes.length * 3);
+        nodeColors = new Float32Array(nodes.length * 3);
+      }
+
+      sortedNodeIdx = updateNodes(
+        nodeVertices,
+        nodeColors, 
+        nextProps.nodes,
+        nextProps.rotation,
+        nextProps.hoverIndex
+      );
     }
 
-    if (!areEqual('nodes')) {
-      this.setState({
-        nodeColors: getNodeColors(nextProps.nodes, 1, 0.95, this.state.hoverIndex),
-        nodeGlowColors: getNodeColors(nextProps.nodes, 1, 0.7, this.state.hoverIndex)
-      });
-    }
-
-    if (!areEqual('edges')) {
-      this.setState({
-        edgeColors: getEdgeColors(nextProps.edges)
-      });
-    }
+    this.setState({
+      edgeVertices, edgeColors, nodeVertices, nodeColors, sortedNodeIdx, cameraPosition
+    });
   }
 
   render() {
-    const { width, height, rotation, pointTexture, glowTexture } = this.props;
-    const { nodeVertices, nodeColors, nodeGlowColors, edgeVertices, edgeColors, scale } = this.state;
-
-    this.cameraPosition = new THREE.Vector3(0, 0, scale);
-    const groupScale = new THREE.Vector3(50, 50, 50);
+    const { width, height, rotation } = this.props;
+    const { nodeVertices, nodeColors, edgeVertices, edgeColors, cameraPosition } = this.state;
 
     return (
       <div ref='container' style={{ width, height }}>
@@ -175,7 +234,7 @@ class WebpackGraphTree extends PureComponent {
           />
           <scene
             ref='scene'
-            fog={new THREE.FogExp2(0x000022, 0.0004, 2000)}
+            fog={this.fog}
           >
             <mesh
               position={new THREE.Vector3(0, 0, 0)}
@@ -203,98 +262,28 @@ class WebpackGraphTree extends PureComponent {
               aspect={width / height}
               near={0.1}
               far={10000}
-              position={this.cameraPosition}
+              position={cameraPosition}
             />
             <pointLight
               color={0xffffff}
-              position={this.cameraPosition}
+              position={cameraPosition}
             />
             <resources>
-              <geometry
-                resourceId='glowGeometry'
-                vertices={nodeVertices}
-                colors={nodeGlowColors}
-              />
-              <geometry
+              <bufferGeometry
                 resourceId='starsGeometry'
-                vertices={nodeVertices}
-                colors={nodeColors}
+                position={new THREE.BufferAttribute(nodeVertices, 3)}
+                color={new THREE.BufferAttribute(nodeColors, 3)}
+              />
+              <bufferGeometry
+                resourceId='edgesGeometry'
+                position={new THREE.BufferAttribute(edgeVertices, 3)}
+                color={new THREE.BufferAttribute(edgeColors, 3)}
               />
             </resources>
-            <group rotation={rotation} scale={groupScale}>
-              <points>
-                <geometryResource
-                  // glowing for dummies (true shader glowing should be used instead)
-                  resourceId='glowGeometry'
-                />
-                <pointsMaterial
-                  size={50}
-                  map={glowTexture}
-                  vertexColors={THREE.VertexColors}
-                  alphaTest={0.01}
-                  opacity={0.07}
-                  transparent
-                  depthTest={false}
-                />
-              </points>
-              <points>
-                <geometryResource
-                  resourceId='glowGeometry'
-                />
-                <pointsMaterial
-                  size={44}
-                  map={glowTexture}
-                  vertexColors={THREE.VertexColors}
-                  alphaTest={0.01}
-                  opacity={0.07}
-                  transparent
-                  depthTest={false}
-                />
-              </points>
-              <points>
-                <geometryResource
-                  resourceId='glowGeometry'
-                />
-                <pointsMaterial
-                  size={38}
-                  map={glowTexture}
-                  vertexColors={THREE.VertexColors}
-                  alphaTest={0.01}
-                  opacity={0.07}
-                  transparent
-                  depthTest={false}
-                />
-              </points>
-              <points>
-                <geometryResource
-                  resourceId='glowGeometry'
-                />
-                <pointsMaterial
-                  size={32}
-                  map={glowTexture}
-                  vertexColors={THREE.VertexColors}
-                  alphaTest={0.01}
-                  opacity={0.07}
-                  transparent
-                  depthTest={false}
-                />
-              </points>
-              <points ref='points'>
-                <geometryResource
-                  resourceId='starsGeometry'
-                />
-                <pointsMaterial
-                  size={32}
-                  map={pointTexture}
-                  vertexColors={THREE.VertexColors}
-                  transparent
-                  alphaTest={0.5}
-                />
-              </points>
+            <group rotation={rotation}>
               <lineSegments>
-                <geometry
-                  vertices={edgeVertices}
-                  colors={edgeColors}
+                <geometryResource
+                  resourceId='edgesGeometry'
                 />
                 <lineBasicMaterial
                   linewidth={2}
@@ -303,6 +292,25 @@ class WebpackGraphTree extends PureComponent {
                   transparent
                 />
               </lineSegments>
+              <points ref='points'>
+                <geometryResource
+                  resourceId='starsGeometry'
+                />
+                <shaderMaterial
+                  fragmentShader={require('./shaders/star.frag')}
+                  vertexShader={require('./shaders/star.vert')}
+                  transparent
+                  alphaTest={0.5}
+                  depthTest={false}
+                  fog
+                >
+                  <uniforms>
+                    <uniform type='float' name='size' value={0.4} />
+                    <uniform type='vec3' name='fogColor' value={this.fog.color} />
+                    <uniform type='float' name='fogDensity' value={this.fog.density} />
+                  </uniforms>
+                </shaderMaterial>
+              </points>
             </group>
           </scene>
         </React3>
@@ -323,6 +331,7 @@ class WebpackGraphTree extends PureComponent {
 
   handleMouseMove = event => {
     const mouseInput = this.refs.mouseInput;
+    let hoverIndex;
 
     if (!mouseInput.isReady()) {
       return;
@@ -334,21 +343,22 @@ class WebpackGraphTree extends PureComponent {
     );
 
     if (intersections.length) {
-      this.setState({
-        hoverIndex: intersections[0].index
-      });
+      hoverIndex = this.state.sortedNodeIdx[intersections[0].index];
     } else {
-      this.setState({
-        hoverIndex: -1
-      });
+      hoverIndex = -1;
+    }
+
+    if (hoverIndex !== this.props.hoverIndex) {
+      this.props.onHoverIndexChanged(hoverIndex);
     }
   }
+
+  debouncedHandleMouseMove = debounce(this.handleMouseMove, 10, { leading: true });
 }
 
 export default class WebpackGraph extends PureComponent {
   state = {
     stats: undefined,
-    scale: 30,
     edges: [],
     nodes: [],
     zoom: 5,
@@ -358,29 +368,20 @@ export default class WebpackGraph extends PureComponent {
     started: true,
     targetRotationX: 0,
     targetRotationY: 0,
-    font: undefined
+    font: undefined,
+    hoverIndex: -1,
+    autoStop: false,
+    autoRotate: true
   };
 
   lastDate = new Date();
+
+  maxZoom = 15;
 
   componentDidMount() {
     window.addEventListener('resize', this.handleSizeChange);
 
     getDefaultStats().then(stats => this.setState({ stats }));
-
-    // new THREE.FontLoader().load('static/typeface.json',
-    //   font => this.setState({ font }),
-    //   undefined,
-    //   (e) => console.error('ERROR', e)
-    // );
-
-    new THREE.TextureLoader().load('static/ball.png',
-      pointTexture => this.setState({ pointTexture })
-    );
-
-    new THREE.TextureLoader().load('static/glow.png',
-      glowTexture => this.setState({ glowTexture })
-    );
   }
 
   handleSizeChange = () => {
@@ -391,27 +392,42 @@ export default class WebpackGraph extends PureComponent {
   }
 
   componentDidUpdate(prevProps, prevState) {
-    if (this.state.stats !== prevState.stats) {
+    const autoStopChanged = prevState.autoStop !== this.state.autoStop;
+
+    if (autoStopChanged && this.state.autoStop) {
+      this.layout.stop();
+    } else if (autoStopChanged && !this.state.autoStop) {
+      if (this.state.started) {
+        this.layout.start(this.handleLayoutUpdate);
+      }
+    } else if (this.state.stats !== prevState.stats) {
       this.startLayout();
     }
   }
 
   handleAnimate = () => {
-    const minRotationX = 0.0005;
-    const minRotationY = 0.005;
+    const minRotationX = this.state.autoRotate ? 0.0005 : 0; 
+    const minRotationY = this.state.autoRotate ? 0.001 : 0;
     const { targetRotationX, targetRotationY, rotation } = this.state;
     const { x: rotationX, y: rotationY } = rotation;
+    const toX = targetRotationY + minRotationX;
+    const toY = targetRotationX + minRotationY;
+
+    const autoStop = (Math.abs(rotationX - toX) > 0.1 || Math.abs(rotationY - toY) > 0.1);
 
     if (
-      Math.abs(rotationY - targetRotationX - minRotationY) > 0.0001 ||
-      Math.abs(rotationX - targetRotationY - minRotationX) > 0.0001
+      Math.abs(rotationX - toX) > 0.01 ||
+      Math.abs(rotationY - toY) > 0.01
     ) {
       this.setState({
         rotation: new THREE.Euler(
-          rotationX + (targetRotationY - rotationX) * 0.05,
-          rotationY + (targetRotationX - rotationY) * 0.05,
+          rotationX + (toX - rotationX) * 0.05,
+          rotationY + (toY - rotationY) * 0.05,
           0
-        )
+        ),
+        targetRotationY: targetRotationY + minRotationX,
+        targetRotationX: targetRotationX + minRotationY,
+        autoStop
       });
     } else {
       this.setState({
@@ -420,8 +436,9 @@ export default class WebpackGraph extends PureComponent {
           rotationY + minRotationY,
           0
         ),
-        targetRotationX: targetRotationX + minRotationX,
-        targetRotationY: targetRotationY + minRotationY
+        targetRotationY: targetRotationY + minRotationX,
+        targetRotationX: targetRotationX + minRotationY,
+        autoStop
       });
     }
   };
@@ -455,18 +472,10 @@ export default class WebpackGraph extends PureComponent {
   }
 
   render() {
-    const { width, height, edges, nodes, scale, font, zoom, pointTexture, glowTexture,
+    const { width, height, edges, nodes, font, zoom,
             targetRotationX, targetRotationY, rotation, started, hoverIndex } = this.state;
     const roundButtonStyle = { cursor: 'pointer', width: '2rem', height: '2rem' };
     const buttonStyle = { cursor: 'pointer' };
-
-    // if (!font) {
-    //   return null;
-    // }
-
-    if (!pointTexture || !glowTexture) {
-      return null;
-    }
 
     const rotX = (rotation.x / Math.PI) % 2;
 
@@ -486,14 +495,12 @@ export default class WebpackGraph extends PureComponent {
             height={height}
             edges={edges}
             nodes={nodes}
-            scale={scale}
             className='border col col-8'
             rotation={rotation}
             onAnimate={this.handleAnimate}
             zoom={zoom}
             font={font}
-            pointTexture={pointTexture}
-            glowTexture={glowTexture}
+            hoverIndex={hoverIndex}
             onHoverIndexChanged={hoverIndex => this.setState({ hoverIndex })}
           />
         </TouchableContainer>
@@ -527,7 +534,7 @@ export default class WebpackGraph extends PureComponent {
               <button
                 className='ml1 pl1 pr1 circle bg-black white border'
                 style={roundButtonStyle}
-                onClick={() => this.setState({ zoom: Math.min(100, zoom + 1) })}
+                onClick={() => this.setState({ zoom: Math.min(this.maxZoom, zoom + 1) })}
               >
                 <span style={{ fontSize: 16 }}>+</span>
               </button>
@@ -559,6 +566,14 @@ export default class WebpackGraph extends PureComponent {
               >
                 {started ? 'Stop' : 'Start'}
               </button>
+              <input
+                className='ml2'
+                onChange={() => this.setState({ autoRotate: !this.state.autoRotate })}
+                checked={this.state.autoRotate}
+                type='checkbox'
+                id='rotate'
+              />
+              <label htmlFor='rotate' className='ml1'><small>Auto-Rotate</small></label>
             </div>
           </div>
         </div>
@@ -567,7 +582,7 @@ export default class WebpackGraph extends PureComponent {
   }
 
   handleZoom = zoomDelta => {
-    const zoom = Math.min(100, Math.max(1, this.state.zoom + zoomDelta));
+    const zoom = Math.min(this.maxZoom, Math.max(1, this.state.zoom + zoomDelta));
 
     this.setState({ zoom });
   }
@@ -585,7 +600,9 @@ export default class WebpackGraph extends PureComponent {
       this.layout.stop();
     } else {
       this.setState({ started: true });
-      this.layout.start(this.handleLayoutUpdate);
+      if (!this.state.autoStop) {
+        this.layout.start(this.handleLayoutUpdate);
+      }
     }
   }
 

@@ -64,6 +64,11 @@ module.exports = {
         loader: 'json'
       },
       {
+        test: /\.(vert|frag)$/,
+        include: [paths.appSrc, paths.appNodeModules],
+        loader: 'raw'
+      },
+      {
         test: /\.(jpg|png|gif|eot|svg|ttf|woff|woff2)(\?.*)?$/,
         include: [paths.appSrc, paths.appNodeModules],
         loader: 'file',
