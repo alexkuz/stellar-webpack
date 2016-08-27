@@ -69,6 +69,7 @@
     "three": "^0.79.0"
   },
   "scripts": {
+    "lint": "eslint src",
     "start": "node ./scripts/start.js",
     "build": "node ./scripts/build.js",
     "preversion": "npm run lint",
