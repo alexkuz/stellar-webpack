@@ -1,6 +1,6 @@
 {
   "name": "stellar-webpack",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "homepage": "https://alexkuz.github.io/stellar-webpack/",
   "devDependencies": {
