@@ -50,12 +50,13 @@ const updateNodes = (vertices, colors, nodes, rotation, hoverIdx) => {
 
   for (let i = nodes.length - 1; i >= 0; i--) {
     p = nodes[order[i]].p;
+    h = nodes[order[i]].hue;
 
     vertices[i * 3] = p.x;
     vertices[i * 3 + 1] = p.y;
     vertices[i * 3 + 2] = p.z;
 
-    h = (p.x + p.y + p.z) / 50;
+    // h = (p.x + p.y + p.z) / 50;
     color.setHSL(h % 1, order[i] === hoverIdx ? 1 : s, order[i] === hoverIdx ? 1 : l);
 
     colors[i * 3] = color.r;
@@ -73,6 +74,8 @@ const updateEdges = (vertices, colors, edges) => {
   for (var i = edges.length - 1; i >= 0; i--) {
     p1 = edges[i].p1;
     p2 = edges[i].p2;
+    h1 = edges[i].hue1;
+    h2 = edges[i].hue2;
 
     vertices[i * 6] = p1.x;
     vertices[i * 6 + 1] = p1.y;
@@ -81,14 +84,14 @@ const updateEdges = (vertices, colors, edges) => {
     vertices[i * 6 + 4] = p2.y;
     vertices[i * 6 + 5] = p2.z;
 
-    h1 = (p1.x + p1.y + p1.z) / 50;
+    // h1 = (p1.x + p1.y + p1.z) / 50;
     color.setHSL(h1 % 1, 0, 0.3);
 
     colors[i * 6] = color.r;
     colors[i * 6 + 1] = color.g;
     colors[i * 6 + 2] = color.b;
 
-    h2 = (p2.x + p2.y + p2.z) / 50;
+    // h2 = (p2.x + p2.y + p2.z) / 50;
     color.setHSL(h2 % 1, 0.9, 0.7);
 
     colors[i * 6 + 3] = color.r;
@@ -107,7 +110,7 @@ export default class WebpackGraphTree extends PureComponent {
     cameraPosition: new THREE.Vector3(0, 0, 1000)
   };
 
-  fog = new THREE.FogExp2(0x000022, 0.02);
+  fog = new THREE.FogExp2(0x000022, 0.015);
 
   static defaultProps = {
     width: 1200,

@@ -37,6 +37,29 @@ function getTreeFromStats(json) {
   };
 }
 
+const hueCache = {};
+const strToHue = str => {
+  if (!hueCache[str]) {
+    hueCache[str] = Math.abs(
+      str.split('')
+      .map(c => c.charCodeAt(0))
+      .reduce((s, n) => (s + Math.abs(Math.sin(n)) * 10000), 0) % 1
+    );
+  }
+
+  return hueCache[str];
+}
+
+const getHue = path => {
+  const pathArr = path.split('/');
+  const fileName = pathArr.pop();
+  const len = pathArr.length;
+
+  const hueBase = strToHue(pathArr.filter((p, i) => i < (1 + len / 2)).join('/'));
+
+  return (hueBase + len * 0.1 + strToHue(fileName) * 0.15) % 1;
+}
+
 export default class WebpackGraph extends PureComponent {
   state = {
     stats: undefined,
@@ -144,10 +167,16 @@ export default class WebpackGraph extends PureComponent {
     this.setState({
       edges: this.layout.graph.edges.map(e => {
         const spring = this.layout.spring(e);
-        return { id: e.id, p1: spring.point1.p, p2: spring.point2.p };
+        return {
+          id: e.id,
+          p1: spring.point1.p,
+          p2: spring.point2.p,
+          hue1: getHue(e.source.id),
+          hue2: getHue(e.target.id)
+        };
       }),
       nodes: this.layout.graph.nodes.map(n =>
-        ({ id: n.id, p: this.layout.point(n).p })
+        ({ id: n.id, hue: getHue(n.id), p: this.layout.point(n).p })
       )
     });
   }
