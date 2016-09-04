@@ -178,6 +178,8 @@ export default class WebpackGraphTree extends PureComponent {
         nextProps.rotation,
         nextProps.hoverIndex
       );
+
+      this.refs.points.geometry.computeBoundingSphere();
     }
 
     this.setState({

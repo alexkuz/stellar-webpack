@@ -25,7 +25,9 @@ function getTreeFromStats(json) {
   //   ]
   // };
 
-  const tree = json.modules.reduce((t, module) =>
+  const modules = json.modules || json.children[0].modules;
+
+  const tree = modules.reduce((t, module) =>
     module.reasons.reduce((t1, reason) => ({
       nodes: [...t1.nodes, reason.module, module.name],
       edges: [...t1.edges, [reason.module, module.name]]
@@ -237,6 +239,7 @@ export default class WebpackGraph extends PureComponent {
             <div className='col col-7 left-align flex items-center nowrap'>
               <input
                 type='file'
+                value=''
                 className='pl2 pt1 pr2 pb1 rounded bg-black white border'
                 style={{ maxWidth: '8rem' }}
                 onChange={this.handleSelectFile}
