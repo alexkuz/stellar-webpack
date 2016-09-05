@@ -16,10 +16,10 @@ async function getDefaultStats() {
 
 function getTreeFromStats(json) {
   // return {
-  //   nodes: ['a', 'b', 'c', 'd', 'e'],
+  //   nodes: ['a', 'b long long long long long string', 'c', 'd', 'e'],
   //   edges: [
-  //     ['a', 'b'],
-  //     ['a', 'c'],
+  //     ['a', 'b long long long long long string'],
+  //     ['b long long long long long string', 'c'],
   //     ['a', 'd'],
   //     ['a', 'e']
   //   ]
@@ -112,7 +112,7 @@ export default class WebpackGraph extends PureComponent {
   }
 
   handleAnimate = () => {
-    const minRotationX = this.state.autoRotate ? 0.0005 : 0; 
+    const minRotationX = this.state.autoRotate ? 0.0005 : 0;
     const minRotationY = this.state.autoRotate ? 0.001 : 0;
     const { targetRotationX, targetRotationY, rotation } = this.state;
     const { x: rotationX, y: rotationY } = rotation;
@@ -135,7 +135,7 @@ export default class WebpackGraph extends PureComponent {
         targetRotationX: targetRotationX + minRotationY,
         autoStop
       });
-    } else {
+    } else if (this.state.autoRotate) {
       this.setState({
         rotation: new THREE.Euler(
           rotationX + minRotationX,
@@ -146,6 +146,8 @@ export default class WebpackGraph extends PureComponent {
         targetRotationX: targetRotationX + minRotationY,
         autoStop
       });
+    } else {
+      this.setState({ autoStop });
     }
   };
 
@@ -166,6 +168,10 @@ export default class WebpackGraph extends PureComponent {
   }
 
   handleLayoutUpdate = () => {
+    const nodes = this.layout.graph.nodes.map((n, idx) =>
+      ({ id: n.id, idx, hue: getHue(n.id), p: this.layout.point(n).p })
+    );
+
     this.setState({
       edges: this.layout.graph.edges.map(e => {
         const spring = this.layout.spring(e);
@@ -174,12 +180,12 @@ export default class WebpackGraph extends PureComponent {
           p1: spring.point1.p,
           p2: spring.point2.p,
           hue1: getHue(e.source.id),
-          hue2: getHue(e.target.id)
+          hue2: getHue(e.target.id),
+          sourceIdx: nodes.find(node => node.id === e.source.id).idx,
+          targetIdx: nodes.find(node => node.id === e.target.id).idx
         };
       }),
-      nodes: this.layout.graph.nodes.map(n =>
-        ({ id: n.id, hue: getHue(n.id), p: this.layout.point(n).p })
-      )
+      nodes
     });
   }
 
@@ -214,11 +220,14 @@ export default class WebpackGraph extends PureComponent {
             zoom={zoom}
             font={font}
             hoverIndex={hoverIndex}
-            onHoverIndexChanged={hoverIndex => this.setState({ hoverIndex })}
+            onHoverIndexChanged={this.handleHoverIndexChanged}
           />
         </TouchableContainer>
         <div className='absolute left-0 top-0 mt3 ml3 z1 white'>
-          <span style={{ fontSize: 30 }}>Stellar Webpack</span>
+          <span style={{ fontSize: 30 }}>
+            Stellar Webpack
+            <small> v{process.env.__VERSION__}</small>
+          </span>
         </div>
         {(hoverIndex !== -1) && nodes[hoverIndex] &&
           <div className='absolute right-0 top-0 mt4 mr3 z1 white'>
@@ -322,6 +331,8 @@ export default class WebpackGraph extends PureComponent {
       </div>
     );
   }
+
+  handleHoverIndexChanged = hoverIndex => this.setState({ hoverIndex });
 
   handleZoom = zoomDelta => {
     const zoom = Math.min(this.maxZoom, Math.max(1, this.state.zoom + zoomDelta));

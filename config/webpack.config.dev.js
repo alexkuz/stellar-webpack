@@ -100,7 +100,10 @@ module.exports = {
       template: paths.appHtml,
       favicon: paths.appFavicon,
     }),
-    new webpack.DefinePlugin({ 'process.env.NODE_ENV': '"development"' }),
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': '"development"',
+      'process.env.__VERSION__': JSON.stringify(process.env.npm_package_version)
+    }),
     // Note: only CSS is currently hot reloaded
     new webpack.HotModuleReplacementPlugin(),
     new CaseSensitivePathsPlugin()

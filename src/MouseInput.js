@@ -104,6 +104,8 @@ class MouseInput extends Module {
     this._onMouseMove = (event) => {
       this._mouse.set(event.clientX, event.clientY);
 
+      this._intersectionsForClick = null;
+
       if (!this._active) {
         this._updateEnterLeave();
       }

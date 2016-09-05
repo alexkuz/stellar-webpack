@@ -124,7 +124,10 @@ module.exports = {
         minifyURLs: true
       }
     }),
-    new webpack.DefinePlugin({ 'process.env.NODE_ENV': '"production"' }),
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': '"production"',
+      'process.env.__VERSION__': JSON.stringify(process.env.npm_package_version)
+    }),
     new webpack.optimize.OccurrenceOrderPlugin(),
     new webpack.optimize.DedupePlugin(),
     new webpack.optimize.UglifyJsPlugin({
