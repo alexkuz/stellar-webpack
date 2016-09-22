@@ -1,5 +1,5 @@
 import React, { PureComponent } from 'react';
-import React3 from 'react-three-renderer';
+import React3 from '@alexkuz/react-three-renderer';
 import THREE from 'three';
 import MouseInput from './MouseInput';
 import debounce from 'lodash.debounce';

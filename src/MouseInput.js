@@ -1,10 +1,10 @@
-import React3 from 'react-three-renderer';
+import React3 from '@alexkuz/react-three-renderer';
 import THREE from 'three';
 import ReactUpdates from 'react/lib/ReactUpdates';
 
 import SyntheticMouseEvent from 'react/lib/SyntheticMouseEvent';
 
-import Module from 'react-three-renderer/lib/Module';
+import Module from '@alexkuz/react-three-renderer/lib/Module';
 
 import PropTypes from 'react/lib/ReactPropTypes';
 
