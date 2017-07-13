@@ -1,6 +1,6 @@
 import React, { PureComponent } from 'react';
 import React3 from '@alexkuz/react-three-renderer';
-import THREE from 'three';
+import * as THREE from 'three';
 import MouseInput from './MouseInput';
 import debounce from 'lodash.debounce';
 import createTextTexture from './createTextTexture';
@@ -338,11 +338,13 @@ export default class WebpackGraphTree extends PureComponent {
                 resourceId='starsGeometry'
                 position={new THREE.BufferAttribute(nodeVertices, 3)}
                 color={new THREE.BufferAttribute(nodeColors, 3)}
+                index={null}
               />
               <bufferGeometry
                 resourceId='edgesGeometry'
                 position={new THREE.BufferAttribute(edgeVertices, 3)}
                 color={new THREE.BufferAttribute(edgeColors, 3)}
+                index={null}
               />
             </resources>
             <group rotation={rotation}>

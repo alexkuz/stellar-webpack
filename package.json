@@ -51,6 +51,7 @@
     "whatwg-fetch": "1.0.0"
   },
   "dependencies": {
+    "@alexkuz/react-three-renderer": "^3.1.0",
     "basscss": "^8.0.2",
     "basscss-background-colors": "^2.1.0",
     "basscss-border-colors": "^2.1.0",
@@ -61,12 +62,11 @@
     "paths-js": "^0.4.4",
     "raf": "^3.2.0",
     "rc-tooltip": "^3.4.2",
-    "react": "^15.2.1",
+    "react": "=15.5.3",
     "react-art": "^0.15.1",
-    "react-dom": "^15.2.1",
-    "@alexkuz/react-three-renderer": "^3.0.0",
+    "react-dom": "=15.5.3",
     "springy": "^2.7.1",
-    "three": "^0.79.0"
+    "three": "^0.86.0"
   },
   "scripts": {
     "lint": "eslint src",

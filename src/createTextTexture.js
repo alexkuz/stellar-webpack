@@ -1,4 +1,4 @@
-import THREE from 'three';
+import * as THREE from 'three';
 
 const rgba = (c, a) => `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`;
 

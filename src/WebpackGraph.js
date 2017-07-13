@@ -1,6 +1,6 @@
 import React, { PureComponent } from 'react';
 import { Graph, Layout } from './springy3d';
-import THREE from 'three';
+import * as THREE from 'three';
 import uniq from 'lodash.uniq';
 import TouchableContainer from './TouchableContainer';
 import WebpackGraphTree from './WebpackGraphTree';
